@@ -60,6 +60,15 @@ def extract_watermark(img_with_watermark, img):
     return img_with_watermark - (img/(2*delta)).astype(int) * 2*delta - get_v(img.shape)
 
 
+# Извлечение водяного знака без использования изначального изображения(контейнера)
+def extract_watermark_without_orig_img(img_with_watermark, img) -> np.ndarray:
+    b_plane = img_with_watermark[:, :, 1]
+    img_without_v = b_plane - get_v(img.shape)
+    delta_dividable_values = img_without_v % (2 * delta)
+    extracted_watermark = delta_dividable_values > 0
+    return extracted_watermark.astype('uint8')
+
+
 if __name__ == '__main__':
     bit_plane = 4
     channel = 2
@@ -71,47 +80,65 @@ if __name__ == '__main__':
     # Изображение контейнер
     fig.add_subplot(2, 5, 1)
     imshow(c_img)
+    plt.title('Контейнер', fontsize=9)
 
     # Изображение встраимоевое
+
     fig.add_subplot(2, 5, 2)
     imshow(w_img)
+    plt.title('Встраимовое\nизображение', fontsize=9)
 
     # Зелёный канал изображения
     green, green_channel = get_channel(c_img, 1)
     fig.add_subplot(2, 5, 3)
+    plt.title('Зелёный канал\nконтейнера', fontsize=9)
     imshow(green)
+
 
     # 4-ая битовая плоскость
     plane = get_plane(green_channel, 4)
     fig.add_subplot(2, 5, 4)
+    plt.title('Битовая плоскость', fontsize=9)
     imshow(plane, cmap='gray')
+
 
     # Встраивание в контейнер
     green_channel_mark = green_channel - (plane * 2**3) + (w_img * 2**3)
     c_img[:, :, 1] = green_channel_mark
     fig.add_subplot(2, 5, 5)
+    plt.title('Контейнер со встроенным\n изображением(СВИ-2)', fontsize=9)
     imshow(c_img)
+
 
     # Изъятие водяного знака
     green, water_mark = get_channel(c_img, 1)
     fig.add_subplot(2, 5, 6)
+    plt.title('Изъятое изображение\n(СВИ-2)', fontsize=9)
     imshow(get_plane(water_mark, 4), cmap='gray')
 
-    # СВИ-4 ( Y (3.12) )
 
+    # СВИ-4 ( Y (3.12) )
     delta = 4+4*11 % 3    # 4+4*11(mod3) = 6
 
     # Встраивание в контейнер
     img_with_watermark = c_img.copy()
     img_with_watermark[:, :, 1] = insert_watermark(RGB2YCbCr(c_img.copy()), w_img.copy())
     fig.add_subplot(2, 5, 7)
+    plt.title('Контейнер со встроенным\n изображением(СВИ-4)', fontsize=9)
     imshow(img_with_watermark)
+
 
     # Извлечение
     extracted_w = extract_watermark(img_with_watermark[:, :, 1], RGB2YCbCr(c_img.copy()))
     fig.add_subplot(2, 5, 8)
+    plt.title('Изъятое изображение\n(СВИ-4)', fontsize=9)
     imshow(extracted_w, cmap='gray')
 
+
     # Без картинки
+    a = extract_watermark_without_orig_img(img_with_watermark, c_img[:, :, 0])
+    fig.add_subplot(2, 5, 9)
+    plt.title('Изъятое изображение\n без контейнера(СВИ-4)', fontsize=9)
+    imshow(a, cmap='gray')
 
     show()
