@@ -1,5 +1,10 @@
 import socket
 import struct
+import numpy as np
+import cv2
+from scipy import fft, ifft
+from matplotlib import pyplot as plt
+from skimage.io import imshow, show
 
 
 def receive_file_size(sck: socket.socket):
@@ -38,11 +43,52 @@ def receive_file(sck: socket.socket, filename):
                 received_bytes += len(chunk)
 
 
-with socket.create_server(("localhost", 6190)) as server:
-    print("Ожидание клиента...")
-    conn, address = server.accept()
-    print(f"{address[0]}:{address[1]} подключен.")
-    print("Получаем файл...")
-    receive_file(conn, "goldhill-received.jpg")
-    print("Файл получен.")
+def moving_average(x, w):
+    return np.convolve(x, np.ones(w), 'same') / w
+
+
+def recovery():
+    orig = cv2.imread("goldhill.tif", cv2.IMREAD_GRAYSCALE)
+    noise_img = cv2.imread(f"goldhill-received1.tif", cv2.IMREAD_GRAYSCALE)
+
+    sum_all = fft.fft(noise_img.flatten())
+    for i in range(2, 11):
+        noise_img = cv2.imread(f"goldhill-received{i}.tif", cv2.IMREAD_GRAYSCALE)
+        current = fft.fft(noise_img.flatten())
+        sum_all += current
+
+    y = fft.ifft(sum_all/10)
+    y = moving_average(y, 4)
+    y = np.abs(y)
+    y = y/np.max(y)
+    y = np.reshape(y, (512, 512))
+
+    fig = plt.figure(figsize=(9, 3))
+    fig.add_subplot(1, 3, 1)
+    plt.title('Исходное')
+    imshow(orig, cmap='gray')
+
+    fig.add_subplot(1, 3, 2)
+    plt.title('Зашумленное')
+    imshow(noise_img, cmap='gray')
+
+    fig.add_subplot(1, 3, 3)
+    plt.title('Востановленное')
+    imshow(y, cmap='gray')
+    show()
+
+
+number_of_files = 10
+for i in range(1, number_of_files+1):
+    with socket.create_server(("localhost", 6190)) as server:
+        print("Ожидание клиента...")
+        conn, address = server.accept()
+        print(f"{address[0]}:{address[1]} подключен.")
+        print("Получаем файл...")
+        receive_file(conn, f"goldhill-received{i}.tif")
+        print(f"Файл получен {i}/{number_of_files}")
 print("Соединение закрыто.")
+
+print("Восстановление...")
+recovery()
+
