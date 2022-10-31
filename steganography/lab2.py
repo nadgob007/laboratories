@@ -114,7 +114,7 @@ def extraction2(fw_, f, a):
     return omega_
 
 
-def calc_a(a):
+def calc_a(a, beta_mse=False):
     C = io.imread("baboon.tif", as_gray=False)
     # Генерация ЦВЗ-последовательности, распределенных по нормальному закону  (C * 3/4) * 1/2 = 98304
     size = int((C.shape[0] * C.shape[0] * 3 / 4) * 1 / 2)
@@ -132,9 +132,15 @@ def calc_a(a):
         C_fft = fft.fft(channel)
         f.append(C_fft)
 
-        # Адитивное встраивание Cw = C + a*W
+        # Адитивное встраивание Cw = C + a*W. fw - Матрица признаков носителя информации
         Cw, map = inserting2(C_fft, W, a)
-        C_ = np.abs(fft.ifft(Cw))
+
+        if beta_mse:
+            # Уменьшаем визуальные искажения используя  beta_mse
+            beta = roll(channel, 9)
+            C_ = np.abs(fft.ifft(Cw) * beta + channel * (1 - beta))
+        else:
+            C_ = np.abs(fft.ifft(Cw))
 
         result[:, :, i] = C_.astype(int)
 
@@ -145,7 +151,7 @@ def calc_a(a):
     Cw = io.imread("baboon_with_watermark.png", as_gray=False)
     psnr = peak_signal_noise_ratio(C, Cw)
 
-    ps=[]
+    ps = []
     for i in range(3):
         channel = get_channel(image, i)
 
@@ -165,7 +171,7 @@ def calc_a(a):
     return psnr, min(ps)
 
 
-# Rolling 2D window for ND array
+# Прохождение по изображению усредняющим окном 9х9. Возвращает beta
 def roll(a, b):
     mat = np.zeros(a.shape)
 
@@ -174,11 +180,11 @@ def roll(a, b):
 
             wind = np.array(0)
             wind = np.delete(wind, 0)
-            # Проверяем, какие элементы в окне валидны
+            # Проверяем, какие элементы попадают в окно
             for w_i in range(b):
                 for w_j in range(b):
 
-                    if (i - int(b/2) + w_i) < 0 or (j - int(b/2) + w_j) < 0:
+                    if (i - int(b/2) + w_i) < 0 or (j - int(b/2) + w_j) < 0 or (i - int(b/2) + w_i) >= a.shape[0] or (j - int(b/2) + w_j) >= a.shape[0]:
                         continue
                     else:
                         current = a[i - int(b / 2) + w_i][j - int(b / 2) + w_j]
@@ -187,23 +193,13 @@ def roll(a, b):
             # Считаем среднеквадратическое отклонение
             std = np.std(wind)
             mat[i][j] = np.std(wind)/max(wind)
+        print(f"{i}/{a.shape[0]}")
     return mat
 
 
 if __name__ == '__main__':
     # Загружаем изображение
     image = io.imread("baboon.tif", as_gray=False)
-
-    a = np.array([[1, 2, 3, 4],
-                  [4, 5, 6, 5],
-                  [7, 8, 9, 6],
-                  [7, 8, 9, 6]])
-
-    b = np.array([[1, 1],
-                  [1, 1]])
-
-    print(roll(a, 3))
-
 
     # Генерация ЦВЗ-последовательности, распределенных по нормальному закону  (C * 3/4) * 1/2 = 98304
     size = int((image.shape[0] * image.shape[0] * 3 / 4) * 1 / 2)
@@ -255,7 +251,7 @@ if __name__ == '__main__':
     for i in range(3):
         channel = get_channel(image, i)
 
-        # ДПФ исходного контейнера. fw_ - матрица признаков принятого носителя
+        # Обратное ДПФ от носителя информации . fw_ - матрица признаков принятого носителя
         fw_ = fft.fft(channel)
 
         # Извлекаем ЦВЗ. omega_- матрица признаков извлеченной информации
@@ -269,22 +265,38 @@ if __name__ == '__main__':
         print(f"Близость[{channels[i]}]: {p}")
         print(f"Близость[{channels[i]}]: {np.abs(p)}\n")
 
+    #
     max_p = 0.0
     max_psnr = 0.0
     for i in np.arange(0.05, 5, 0.05):
-        psnr, p = calc_a(i)
+        psnr, p = calc_a(i, False)
         if psnr > 30:
             if max_p < p:
                 max_p = p
                 a = i
                 max_psnr = psnr
         print(i)
-    print(max_p)
-    print(max_psnr)
-    print(a)
+    print(f"Значение p: {max_p}")
+    print(f"Значение PSNR: {max_psnr}")
+    print(f"Значение a: {a}")
 
-# 0.08257754851076042
+# 0.08257754851076042 seed(1)
 # 52.846426625042184
 # 3.5
-
-    Beta = 1
+    # С beta_mse
+    max_p = 0.0
+    max_psnr = 0.0
+    for i in np.arange(0.05, 5, 0.05):
+        psnr, p = calc_a(i, True)
+        if psnr > 30:
+            if max_p < p:
+                max_p = p
+                a = i
+                max_psnr = psnr
+        print(i)
+    print(f"Значение p: {max_p}")
+    print(f"Значение PSNR: {max_psnr}")
+    print(f"Значение a: {a}")
+# Значение p: 0.08257754851076042
+# Значение PSNR: 53.504182849999715
+# Значение a: 3.5
