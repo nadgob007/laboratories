@@ -147,15 +147,15 @@ def calc_a(a, beta_mse=False):
     # Тип массива меняем на int
     result = np.int_(result)
     # Сохраняем изображение
-    io.imsave("baboon_with_watermark.png", result)
+    io.imsave("baboon_with_watermark_betamse.png", result)
     Cw = io.imread("baboon_with_watermark.png", as_gray=False)
     psnr = peak_signal_noise_ratio(C, Cw)
 
     ps = []
     for i in range(3):
-        channel = get_channel(image, i)
+        channel = get_channel(Cw, i)
 
-        # ДПФ исходного контейнера. fw_ - матрица признаков принятого носителя
+        # ДПФ полученного контейнера. fw_ - матрица признаков принятого носителя
         fw_ = fft.fft(channel)
 
         # Извлекаем ЦВЗ. omega_- матрица признаков извлеченной информации
@@ -249,7 +249,7 @@ if __name__ == '__main__':
 
     channels = ["Red", "Green", "Blue"]
     for i in range(3):
-        channel = get_channel(image, i)
+        channel = get_channel(img, i)
 
         # Обратное ДПФ от носителя информации . fw_ - матрица признаков принятого носителя
         fw_ = fft.fft(channel)
@@ -283,6 +283,11 @@ if __name__ == '__main__':
 # 0.08257754851076042 seed(1)
 # 52.846426625042184
 # 3.5
+
+# Значение p: 0.06703117574558583
+# Значение PSNR: 52.84528183396575
+# Значение a: 0.1
+
     # С beta_mse
     max_p = 0.0
     max_psnr = 0.0
