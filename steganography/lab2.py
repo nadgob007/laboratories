@@ -7,8 +7,8 @@ from scipy import fft, ifft
 from scipy.signal import convolve2d
 
 
-def psnr(W, Wr):
-    e = (np.sum((W - Wr) ** 2)) / (len(W) * len(W[0]))
+def psnr(omega, omega_):
+    e = (np.sum((omega - omega_) ** 2)) / (len(omega) * len(omega[0]))
     p = 10 * np.log10(255 ** 2 / e)
     return p
 
@@ -19,8 +19,8 @@ def get_channel(img, channel_num):  # 0-red, 1-green, 2-blue
     return channel
 
 
-#   Адитивное встраивание Cw = C + a*W плюсиком
-def inserting(C, W, a):
+#   Адитивное встраивание Cw = C + a*omega плюсиком
+def inserting(C, omega, a):
     size = 512
     count = 0
     map = np.zeros(C.shape)
@@ -29,15 +29,15 @@ def inserting(C, W, a):
             if (i < (size/4) or i >= (size * 3/4)) and (j < (size/4) or j >= (size * 3/4)):
                 continue
             else:
-                C[i][j] = complex(C[i][j].real + a * W[count], C[i][j].imag)
+                C[i][j] = complex(C[i][j].real + a * omega[count], C[i][j].imag)
                 map[i][j] = 1
                 count += 1
         print(i)
     return C, map
 
 
-#   Адитивное встраивание Cw = C + a*W . половина от плюсика
-def inserting2(C, W, a):
+#   Адитивное встраивание Cw = C + a*omega . половина от плюсика
+def inserting2(C, omega, a):
     size = 512
     count = 0
     map = np.zeros(C.shape)
@@ -57,7 +57,7 @@ def inserting2(C, W, a):
                     if pull1 == 0:
                         continue
 
-                    C[i][j] = complex(C[i][j].real + a * W[count], C[i][j].imag)
+                    C[i][j] = complex(C[i][j].real + a * omega[count], C[i][j].imag)
                     map[i][j] = 1
                     count += 1
 
@@ -67,7 +67,7 @@ def inserting2(C, W, a):
                     if pull2 == 0:
                         continue
 
-                    C[i][j] = complex(C[i][j].real + a * W[count], C[i][j].imag)
+                    C[i][j] = complex(C[i][j].real + a * omega[count], C[i][j].imag)
                     map[i][j] = 1
                     count += 1
 
@@ -97,7 +97,7 @@ def extraction2(fw_, f, a):
                 if (not condition3) and (not condition4) and (condition1 or condition2):
                     if pull1 == 0:
                         continue
-                    omega_[count] = (fw_[i][j].real - f[i][j].real) / (a * f[i][j].real)
+                    omega_[count] = (fw_[i][j].real - f[i][j].real) / a
                     count += 1
                     pull1 -= 1
 
@@ -105,7 +105,7 @@ def extraction2(fw_, f, a):
                     if pull2 == 0:
                         continue
 
-                    omega_[count] = (fw_[i][j].real - f[i][j].real) / (a * f[i][j].real)
+                    omega_[count] = (fw_[i][j].real - f[i][j].real) / a
                     count += 1
 
                     pull2 -= 1
@@ -119,7 +119,7 @@ def calc_a(a, beta_mse=False):
     # Генерация ЦВЗ-последовательности, распределенных по нормальному закону  (C * 3/4) * 1/2 = 98304
     size = int((C.shape[0] * C.shape[0] * 3 / 4) * 1 / 2)
     np.random.seed(1)
-    W = np.random.normal(0, 1, size)
+    omega = np.random.normal(0, 1, size)
     a = a
 
     # f - матрица признаков носителя
@@ -132,8 +132,8 @@ def calc_a(a, beta_mse=False):
         C_fft = fft.fft(channel)
         f.append(C_fft)
 
-        # Адитивное встраивание Cw = C + a*W. fw - Матрица признаков носителя информации
-        Cw, map = inserting2(C_fft, W, a)
+        # Адитивное встраивание Cw = C + a*omega. fw - Матрица признаков носителя информации
+        Cw, map = inserting2(C_fft, omega, a)
 
         if beta_mse:
             # Уменьшаем визуальные искажения используя  beta_mse
@@ -162,7 +162,7 @@ def calc_a(a, beta_mse=False):
         omega_ = extraction2(fw_, f[i], a)
 
         # omega - матрица признаков встраиваемой информации
-        omega = fft.fft(W)
+        
 
         # Детектирование ЦВЗ. p - функция близости
         p = np.sum(omega*omega_)/( (np.sum(np.power(omega, 2))**0.5) * (np.sum(np.power(omega_, 2))**0.5) )
@@ -203,8 +203,9 @@ if __name__ == '__main__':
 
     # Генерация ЦВЗ-последовательности, распределенных по нормальному закону  (C * 3/4) * 1/2 = 98304
     size = int((image.shape[0] * image.shape[0] * 3 / 4) * 1 / 2)
-    np.random.seed(1)
-    W = np.random.normal(0, 1, size)
+    np.random.seed(4)
+    omega = np.random.normal(0, 1, size)
+    omega2 = np.random.normal(0, 1, size)
     a = 2
 
     # f - матрица признаков носителя
@@ -217,11 +218,11 @@ if __name__ == '__main__':
         C_fft = fft.fft(channel)
         f.append(C_fft)
 
-        # Адитивное встраивание Cw = C + a*W
-        Cw, map = inserting2(C_fft, W, a)
-        C_ = np.abs(fft.ifft(Cw))
+        # Адитивное встраивание Cw = C + a*omega
+        fw, map = inserting2(C_fft, omega, a)
+        Cw = np.real(fft.ifft(fw))
 
-        result[:, :, i] = C_.astype(int)
+        result[:, :, i] = Cw#.astype(int)
 
     # Тип массива меняем на int
     result = np.int_(result)
@@ -247,6 +248,7 @@ if __name__ == '__main__':
     # Загружаем контейнер с водяным знаком
     img = io.imread("baboon_with_watermark.png", as_gray=False)
 
+
     channels = ["Red", "Green", "Blue"]
     for i in range(3):
         channel = get_channel(img, i)
@@ -258,27 +260,28 @@ if __name__ == '__main__':
         omega_ = extraction2(fw_, f[i], a)
 
         # omega - матрица признаков встраиваемой информации
-        omega = W
+        omega = omega
 
         # Детектирование ЦВЗ. p - функция близости
         p = np.sum(omega*omega_)/( (np.sum(np.power(omega, 2))**0.5) * (np.sum(np.power(omega_, 2))**0.5) )
+        #p = np.sum(omega2*omega_)/( (np.sum(np.power(omega2, 2))**0.5) * (np.sum(np.power(omega_, 2))**0.5) )
         print(f"Близость[{channels[i]}]: {p}")
         print(f"Близость[{channels[i]}]: {np.abs(p)}\n")
 
-    #
-    max_p = 0.0
-    max_psnr = 0.0
-    for i in np.arange(0.05, 5, 0.05):
-        psnr, p = calc_a(i, False)
-        if psnr > 30:
-            if max_p < p:
-                max_p = p
-                a = i
-                max_psnr = psnr
-        print(i)
-    print(f"Значение p: {max_p}")
-    print(f"Значение PSNR: {max_psnr}")
-    print(f"Значение a: {a}")
+
+    # max_p = 0.0
+    # max_psnr = 0.0
+    # for i in np.arange(1, 2, 0.05):
+    #     psnr, p = calc_a(i, False)
+    #     if psnr > 30:
+    #         if max_p < p:
+    #             max_p = p
+    #             a = i
+    #             max_psnr = psnr
+    #     print(i)
+    # print(f"Значение p: {max_p}")
+    # print(f"Значение PSNR: {max_psnr}")
+    # print(f"Значение a: {a}")
 
 # 0.08257754851076042 seed(1)
 # 52.846426625042184
@@ -289,19 +292,19 @@ if __name__ == '__main__':
 # Значение a: 0.1
 
     # С beta_mse
-    max_p = 0.0
-    max_psnr = 0.0
-    for i in np.arange(0.05, 5, 0.05):
-        psnr, p = calc_a(i, True)
-        if psnr > 30:
-            if max_p < p:
-                max_p = p
-                a = i
-                max_psnr = psnr
-        print(i)
-    print(f"Значение p: {max_p}")
-    print(f"Значение PSNR: {max_psnr}")
-    print(f"Значение a: {a}")
+    # max_p = 0.0
+    # max_psnr = 0.0
+    # for i in np.arange(0.05, 5, 0.05):
+    #     psnr, p = calc_a(i, True)
+    #     if psnr > 30:
+    #         if max_p < p:
+    #             max_p = p
+    #             a = i
+    #             max_psnr = psnr
+    #     print(i)
+    # print(f"Значение p: {max_p}")
+    # print(f"Значение PSNR: {max_psnr}")
+    # print(f"Значение a: {a}")
 # Значение p: 0.08257754851076042
 # Значение PSNR: 53.504182849999715
 # Значение a: 3.5
